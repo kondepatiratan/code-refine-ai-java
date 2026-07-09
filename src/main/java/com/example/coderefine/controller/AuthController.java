@@ -21,33 +21,21 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody AuthRequest request) {
-        try {
-            if (request == null || request.getEmail() == null || request.getEmail().isBlank()
-                    || request.getPassword() == null || request.getPassword().isBlank()) {
-                return ResponseEntity.badRequest().body(java.util.Map.of("error", "Email and password are required"));
-            }
-            User user = authService.register(request.getEmail(), request.getPassword());
-            return ResponseEntity.ok().body(java.util.Map.of("msg", "registered"));
-        } catch (IllegalArgumentException ex) {
-            return ResponseEntity.badRequest().body(java.util.Map.of("error", ex.getMessage()));
-        } catch (Exception ex) {
-            return ResponseEntity.internalServerError().body(java.util.Map.of("error", "Registration failed"));
+        if (request == null || request.getEmail() == null || request.getEmail().isBlank()
+                || request.getPassword() == null || request.getPassword().isBlank()) {
+            throw new IllegalArgumentException("Email and password are required");
         }
+        User user = authService.register(request.getEmail(), request.getPassword());
+        return ResponseEntity.ok().body(java.util.Map.of("msg", "registered", "id", user.getId()));
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody AuthRequest request) {
-        try {
-            if (request == null || request.getEmail() == null || request.getEmail().isBlank()
-                    || request.getPassword() == null || request.getPassword().isBlank()) {
-                return ResponseEntity.badRequest().body(java.util.Map.of("error", "Email and password are required"));
-            }
-            String token = authService.login(request.getEmail(), request.getPassword());
-            return ResponseEntity.ok(new AuthResponse(token));
-        } catch (IllegalArgumentException ex) {
-            return ResponseEntity.status(401).body(java.util.Map.of("error", ex.getMessage()));
-        } catch (Exception ex) {
-            return ResponseEntity.internalServerError().body(java.util.Map.of("error", "Login failed. Check JWT_SECRET configuration."));
+        if (request == null || request.getEmail() == null || request.getEmail().isBlank()
+                || request.getPassword() == null || request.getPassword().isBlank()) {
+            throw new IllegalArgumentException("Email and password are required");
         }
+        String token = authService.login(request.getEmail(), request.getPassword());
+        return ResponseEntity.ok(new AuthResponse(token));
     }
 }
