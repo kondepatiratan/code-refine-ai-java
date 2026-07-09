@@ -19,18 +19,6 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorBody, HttpStatus.BAD_REQUEST);
     }
 
-    @ExceptionHandler(AuthenticationFailedException.class)
-    public ResponseEntity<Map<String, Object>> handleAuthenticationFailed(AuthenticationFailedException ex, WebRequest request) {
-        Map<String, Object> errorBody = buildErrorResponse(HttpStatus.UNAUTHORIZED.value(), ex.getMessage());
-        return new ResponseEntity<>(errorBody, HttpStatus.UNAUTHORIZED);
-    }
-
-    @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleResourceNotFound(ResourceNotFoundException ex, WebRequest request) {
-        Map<String, Object> errorBody = buildErrorResponse(HttpStatus.NOT_FOUND.value(), ex.getMessage());
-        return new ResponseEntity<>(errorBody, HttpStatus.NOT_FOUND);
-    }
-
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex, WebRequest request) {
         Map<String, Object> errorBody = buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), 

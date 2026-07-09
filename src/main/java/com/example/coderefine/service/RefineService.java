@@ -1,6 +1,5 @@
 package com.example.coderefine.service;
 
-import com.example.coderefine.exception.ResourceNotFoundException;
 import com.example.coderefine.model.Refinement;
 import com.example.coderefine.model.Session;
 import com.example.coderefine.repository.RefinementRepository;
@@ -33,8 +32,7 @@ public class RefineService {
     }
 
     public Session getSession(Long id) {
-        return sessionRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Session not found with id: " + id));
+        return sessionRepository.findById(id).orElseThrow();
     }
 
     public void deleteSession(Long id) {
@@ -42,8 +40,7 @@ public class RefineService {
     }
 
     public Refinement saveRefinement(Long sessionId, String originalCode, String refinedCode, String explanation, String language) {
-        Session session = sessionRepository.findById(sessionId)
-            .orElseThrow(() -> new ResourceNotFoundException("Session not found with id: " + sessionId));
+        Session session = sessionRepository.findById(sessionId).orElseThrow();
         session.setUpdatedAt(LocalDateTime.now());
         sessionRepository.save(session);
         Refinement refinement = new Refinement(session, originalCode, refinedCode, explanation, language, calcScore(refinedCode));

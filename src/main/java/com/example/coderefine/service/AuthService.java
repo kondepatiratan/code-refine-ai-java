@@ -1,6 +1,5 @@
 package com.example.coderefine.service;
 
-import com.example.coderefine.exception.AuthenticationFailedException;
 import com.example.coderefine.model.User;
 import com.example.coderefine.repository.UserRepository;
 import com.example.coderefine.security.JwtUtil;
@@ -33,11 +32,11 @@ public class AuthService {
         String normalizedEmail = normalizeEmail(email);
         Optional<User> userOpt = userRepository.findByEmail(normalizedEmail);
         if (userOpt.isEmpty()) {
-            throw new AuthenticationFailedException("Invalid email or password");
+            throw new IllegalArgumentException("User not found");
         }
         User user = userOpt.get();
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new AuthenticationFailedException("Invalid email or password");
+            throw new IllegalArgumentException("Wrong password");
         }
         return jwtUtil.generateToken(normalizedEmail);
     }
