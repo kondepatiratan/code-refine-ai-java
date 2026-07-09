@@ -32,6 +32,9 @@ public class RefineController {
 
     @PostMapping("/detect-language")
     public Map<String, String> detectLanguage(@RequestBody DetectLanguageRequest request) {
+        if (request == null || request.getCode() == null || request.getCode().isBlank()) {
+            throw new IllegalArgumentException("Code cannot be empty");
+        }
         return Map.of("language", refineService.detectLanguage(request.getCode()));
     }
 
@@ -42,6 +45,12 @@ public class RefineController {
 
     @PostMapping("/refine/sessions")
     public Session createSession(@RequestBody SessionRequest request) {
+        if (request == null || request.getTitle() == null || request.getTitle().isBlank()) {
+            throw new IllegalArgumentException("Session title cannot be empty");
+        }
+        if (request.getLanguage() == null || request.getLanguage().isBlank()) {
+            throw new IllegalArgumentException("Language cannot be empty");
+        }
         return refineService.createSession(request.getTitle(), request.getLanguage());
     }
 
@@ -66,6 +75,13 @@ public class RefineController {
 
     @PostMapping(value = "/refine/sessions/{sid}/refine", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public ResponseEntity<StreamingResponseBody> refine(@PathVariable Long sid, @RequestBody RefineRequest request) {
+        if (request == null || request.getCode() == null || request.getCode().isBlank()) {
+            throw new IllegalArgumentException("Code cannot be empty");
+        }
+        if (request.getLanguage() == null || request.getLanguage().isBlank()) {
+            throw new IllegalArgumentException("Language cannot be empty");
+        }
+        
         StreamingResponseBody stream = outputStream -> {
             try {
                 writeChunk(outputStream, "Refining code...\n");
@@ -84,6 +100,9 @@ public class RefineController {
                 payload.put("model", result.getOrDefault("model", "local-fallback"));
                 writeData(outputStream, payload);
             } catch (Exception ex) {
+                System.err.println("Error during refinement: " + ex.getMessage());
+                ex.printStackTrace();
+                
                 Map<String, Object> payload = new HashMap<>();
                 payload.put("done", true);
                 payload.put("refinedCode", request.getCode());
@@ -91,7 +110,12 @@ public class RefineController {
                 payload.put("errorChanges", List.of());
                 payload.put("score", 0);
                 payload.put("model", "local-fallback");
-                writeData(outputStream, payload);
+                payload.put("error", true);
+                try {
+                    writeData(outputStream, payload);
+                } catch (IOException ioe) {
+                    System.err.println("Failed to write error response: " + ioe.getMessage());
+                }
             }
         };
         return ResponseEntity.ok().contentType(MediaType.TEXT_EVENT_STREAM).body(stream);
