@@ -1,6 +1,10 @@
 package com.example.coderefine.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -24,16 +28,27 @@ public class Session {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "session")
+    // Each session belongs to one user; users can only see their own sessions
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    @JsonIgnore
+    private User user;
+
+    // Deleting a session also deletes its refinements
+    @OneToMany(mappedBy = "session", cascade = CascadeType.REMOVE, orphanRemoval = true)
     private List<Refinement> refinements = new ArrayList<>();
 
     public Session() {}
 
-    public Session(String title, String language) {
+    public Session(String title, String language, User user) {
         this.title = title;
         this.language = language;
+        this.user = user;
         this.updatedAt = LocalDateTime.now();
     }
+
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

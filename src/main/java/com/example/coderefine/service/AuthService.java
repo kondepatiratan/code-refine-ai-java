@@ -1,5 +1,6 @@
 package com.example.coderefine.service;
 
+import com.example.coderefine.exception.InvalidCredentialsException;
 import com.example.coderefine.model.User;
 import com.example.coderefine.repository.UserRepository;
 import com.example.coderefine.security.JwtUtil;
@@ -31,12 +32,9 @@ public class AuthService {
     public String login(String email, String password) {
         String normalizedEmail = normalizeEmail(email);
         Optional<User> userOpt = userRepository.findByEmail(normalizedEmail);
-        if (userOpt.isEmpty()) {
-            throw new IllegalArgumentException("User not found");
-        }
-        User user = userOpt.get();
-        if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new IllegalArgumentException("Wrong password");
+        // Same message for both cases so attackers cannot tell which emails are registered
+        if (userOpt.isEmpty() || !passwordEncoder.matches(password, userOpt.get().getPassword())) {
+            throw new InvalidCredentialsException("Invalid email or password");
         }
         return jwtUtil.generateToken(normalizedEmail);
     }

@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -40,13 +41,22 @@ public class AiRefineService {
     }
 
     public Map<String, Object> refineCode(String code, String language) {
+        return refineCode(code, language, msg -> { });
+    }
+
+    /**
+     * Refines code with a fallback chain: Gemini models -> Mistral -> local fallback.
+     * Each step reports a live status message through {@code progress}, which the
+     * controller streams to the browser as Server-Sent Events.
+     */
+    public Map<String, Object> refineCode(String code, String language, Consumer<String> progress) {
         if (code == null || code.isBlank()) {
             return fallback(code, language, "No code provided");
         }
 
         String preferredProvider = getPreferredProvider();
         if (preferredProvider.equals("gemini") && hasApiKey(geminiApiKey)) {
-            Map<String, Object> response = tryGeminiModels(code, language);
+            Map<String, Object> response = tryGeminiModels(code, language, progress);
             if (response != null) {
                 return response;
             }
@@ -54,6 +64,7 @@ public class AiRefineService {
 
         if (preferredProvider.equals("mistral") && hasApiKey(mistralApiKey)) {
             try {
+                progress.accept("Analyzing with Mistral...");
                 Map<String, Object> response = callMistral(code, language);
                 if (response != null) {
                     return response;
@@ -65,6 +76,7 @@ public class AiRefineService {
 
         if (preferredProvider.equals("gemini") && hasApiKey(mistralApiKey)) {
             try {
+                progress.accept("Gemini unavailable, switching to Mistral fallback...");
                 Map<String, Object> response = callMistral(code, language);
                 if (response != null) {
                     return response;
@@ -75,18 +87,21 @@ public class AiRefineService {
         }
 
         if (preferredProvider.equals("mistral") && hasApiKey(geminiApiKey)) {
-            Map<String, Object> response = tryGeminiModels(code, language);
+            progress.accept("Mistral unavailable, switching to Gemini...");
+            Map<String, Object> response = tryGeminiModels(code, language, progress);
             if (response != null) {
                 return response;
             }
         }
 
+        progress.accept("AI providers unavailable, applying local refinement...");
         return fallback(code, language, "AI provider unavailable. Using local refinement fallback.");
     }
 
-    private Map<String, Object> tryGeminiModels(String code, String language) {
+    private Map<String, Object> tryGeminiModels(String code, String language, Consumer<String> progress) {
         for (String model : getGeminiCandidateModels()) {
             try {
+                progress.accept("Analyzing with Gemini (" + model + ")...");
                 Map<String, Object> response = callGemini(code, language, model);
                 if (response != null) {
                     return response;

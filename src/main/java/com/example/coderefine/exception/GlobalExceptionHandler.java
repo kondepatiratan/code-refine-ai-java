@@ -4,7 +4,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.context.request.WebRequest;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -14,26 +13,35 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex, WebRequest request) {
-        Map<String, Object> errorBody = buildErrorResponse(HttpStatus.BAD_REQUEST.value(), ex.getMessage());
-        return new ResponseEntity<>(errorBody, HttpStatus.BAD_REQUEST);
+    public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
+        return build(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidCredentials(InvalidCredentialsException ex) {
+        return build(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleNotFound(ResourceNotFoundException ex) {
+        return build(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex, WebRequest request) {
-        Map<String, Object> errorBody = buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), 
-            "An unexpected error occurred: " + ex.getMessage());
-        System.err.println("Unhandled exception: ");
+    public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
+        System.err.println("Unhandled exception: " + ex.getMessage());
         ex.printStackTrace();
-        return new ResponseEntity<>(errorBody, HttpStatus.INTERNAL_SERVER_ERROR);
+        // Do not leak internal details to the client
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");
     }
 
-    private Map<String, Object> buildErrorResponse(int status, String message) {
-        Map<String, Object> errorBody = new HashMap<>();
-        errorBody.put("status", status);
-        errorBody.put("message", message);
-        errorBody.put("timestamp", LocalDateTime.now());
-        errorBody.put("success", false);
-        return errorBody;
+    private ResponseEntity<Map<String, Object>> build(HttpStatus status, String message) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("status", status.value());
+        body.put("message", message);
+        body.put("error", message); // the front-end reads "error"
+        body.put("timestamp", LocalDateTime.now());
+        body.put("success", false);
+        return new ResponseEntity<>(body, status);
     }
 }

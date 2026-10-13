@@ -21,6 +21,18 @@ class AiRefineServiceTest {
     }
 
     @Test
+    void shouldReportProgressAndApplyLocalJavaFixWhenNoProvidersAvailable() {
+        AiRefineService service = new AiRefineService("", "gemini-2.5-flash", "", "secret123");
+        java.util.List<String> progress = new java.util.ArrayList<>();
+
+        Map<String, Object> result = service.refineCode("int[] a = {1,2,3};\nSystem.out.println(a[5]);", "java", progress::add);
+
+        assertEquals("local-fallback", result.get("model"));
+        assertTrue(result.get("refinedCode").toString().contains("a[2]"));
+        assertTrue(progress.stream().anyMatch(m -> m.contains("local refinement")));
+    }
+
+    @Test
     void shouldPreferGeminiWhenConfiguredAndUseSingleProviderPerRequest() {
         AiRefineService service = new AiRefineService("test-gemini-key", "gemini-2.0-flash-latest", "", "secret123");
 
