@@ -14,6 +14,7 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.security.Principal;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
@@ -39,24 +40,24 @@ public class RefineController {
     }
 
     @GetMapping("/refine/sessions")
-    public List<Session> getSessions() {
-        return refineService.getAllSessions();
+    public List<Session> getSessions(Principal principal) {
+        return refineService.getAllSessions(principal.getName());
     }
 
     @PostMapping("/refine/sessions")
-    public Session createSession(@RequestBody SessionRequest request) {
+    public Session createSession(@RequestBody SessionRequest request, Principal principal) {
         if (request == null || request.getTitle() == null || request.getTitle().isBlank()) {
             throw new IllegalArgumentException("Session title cannot be empty");
         }
         if (request.getLanguage() == null || request.getLanguage().isBlank()) {
             throw new IllegalArgumentException("Language cannot be empty");
         }
-        return refineService.createSession(request.getTitle(), request.getLanguage());
+        return refineService.createSession(principal.getName(), request.getTitle(), request.getLanguage());
     }
 
     @GetMapping("/refine/sessions/{sid}")
-    public Map<String, Object> getSession(@PathVariable Long sid) {
-        Session session = refineService.getSession(sid);
+    public Map<String, Object> getSession(@PathVariable Long sid, Principal principal) {
+        Session session = refineService.getSession(principal.getName(), sid);
         List<Refinement> refinements = refineService.getRefinements(session);
         Map<String, Object> body = new HashMap<>();
         body.put("id", session.getId());
@@ -68,28 +69,38 @@ public class RefineController {
     }
 
     @DeleteMapping("/refine/sessions/{sid}")
-    public Map<String, Boolean> deleteSession(@PathVariable Long sid) {
-        refineService.deleteSession(sid);
+    public Map<String, Boolean> deleteSession(@PathVariable Long sid, Principal principal) {
+        refineService.deleteSession(principal.getName(), sid);
         return Map.of("ok", true);
     }
 
     @PostMapping(value = "/refine/sessions/{sid}/refine", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public ResponseEntity<StreamingResponseBody> refine(@PathVariable Long sid, @RequestBody RefineRequest request) {
+    public ResponseEntity<StreamingResponseBody> refine(@PathVariable Long sid, @RequestBody RefineRequest request, Principal principal) {
         if (request == null || request.getCode() == null || request.getCode().isBlank()) {
             throw new IllegalArgumentException("Code cannot be empty");
         }
         if (request.getLanguage() == null || request.getLanguage().isBlank()) {
             throw new IllegalArgumentException("Language cannot be empty");
         }
-        
+        // Check ownership before streaming starts, so another user's session returns 404
+        Session session = refineService.getSession(principal.getName(), sid);
+
         StreamingResponseBody stream = outputStream -> {
             try {
                 writeChunk(outputStream, "Refining code...\n");
-                Map<String, Object> result = refineService.refineCode(request.getCode(), request.getLanguage());
+                // Stream each fallback step to the browser as it happens
+                Map<String, Object> result = refineService.refineCode(request.getCode(), request.getLanguage(), msg -> {
+                    try {
+                        writeChunk(outputStream, msg + "\n");
+                    } catch (IOException ignored) {
+                        // client disconnected; refinement still completes and is saved
+                    }
+                });
+                writeChunk(outputStream, "Done. Saving to history...\n");
                 String refinedCode = String.valueOf(result.getOrDefault("refinedCode", request.getCode()));
                 String explanation = String.valueOf(result.getOrDefault("explanation", "Refinement completed."));
 
-                refineService.saveRefinement(sid, request.getCode(), refinedCode, explanation, request.getLanguage());
+                refineService.saveRefinement(session, request.getCode(), refinedCode, explanation, request.getLanguage());
 
                 Map<String, Object> payload = new HashMap<>();
                 payload.put("done", true);
@@ -106,7 +117,7 @@ public class RefineController {
                 Map<String, Object> payload = new HashMap<>();
                 payload.put("done", true);
                 payload.put("refinedCode", request.getCode());
-                payload.put("explanation", "Refinement failed. " + ex.getMessage());
+                payload.put("explanation", "Refinement failed. Please try again.");
                 payload.put("errorChanges", List.of());
                 payload.put("score", 0);
                 payload.put("model", "local-fallback");
@@ -127,7 +138,7 @@ public class RefineController {
     }
 
     private void writeData(OutputStream outputStream, Map<String, Object> data) throws IOException {
-        outputStream.write(("data: " + objectMapper.writeValueAsString(data) + "\n\n").getBytes());
+        outputStream.write(("data: " + objectMapper.writeValueAsString(data) + "\n\n").getBytes(StandardCharsets.UTF_8));
         outputStream.flush();
     }
 }

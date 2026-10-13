@@ -1,0 +1,15 @@
+# Build output
+target/
+
+# Local database files
+data/
+*.mv.db
+*.trace.db
+
+# Secrets
+.env
+
+# IDE
+.vscode/
+.idea/
+*.iml
